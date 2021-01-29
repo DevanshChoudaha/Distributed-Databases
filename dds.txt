@@ -1,0 +1,29 @@
+1.83 billion websites, not pages :(
+
+-> 1.83 billion - Webpages, live on the Internet in 2021
+	-> January 2nd 2021
+	-> Ref: https://www.websitehostingrating.com/internet-statistics-facts/
+
+-> 53 billion - Webpages indexed by Google
+	-> Date: 28 Jan 2021
+	-> Ref: https://www.worldwidewebsize.com/
+	
+-> 13 Billion - Webpages indexed by Microsoft's Bing
+	-> Date: 28 Jan 2021
+	-> Ref: https://www.worldwidewebsize.com/
+
+-> 44 Zettabyte of accessible data
+	-> Date: March 26th, 2020
+	-> Ref: https://www.nodegraph.se/how-much-data-is-on-the-internet/
+
+-> 219 Exabytes - Total World-wide Internet Traffic in the year 2021
+	-> Date: 17 Jan , 2021
+	-> Ref: https://en.wikipedia.org/wiki/Internet_traffic
+
+-> Over 9,00,000 Servers - Owned by Google, the Largest in the world
+	-> Date: Aug 9, 2020
+	-> Ref: https://medium.com/@aniereobisolo/how-fast-is-a-google-server-855fa5431813
+
+-> Over 44 Zettabyte - Total data stored on the Internet
+	-> Date: March 26th, 2020
+	-> Ref: https://www.nodegraph.se/how-much-data-is-on-the-internet/
