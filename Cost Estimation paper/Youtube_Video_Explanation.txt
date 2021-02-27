@@ -1,0 +1,156 @@
+COST ESTIMATION FOR BIG DATA QUERY PROCESSING
+
+What Google BigQuery (and all other do) :
+    - Process
+        Query -> Automatically figure out most efficient plan for execution(using cost-based optimizer)
+
+    - Internally, these systems lavish cost models for predicting runtime behaviour of operator,
+        and select one with least cost
+
+    - Therefore, accuracy of model becomes important, as less accurate model => poor performance
+    
+In this paper,
+    we look at accuracy of cost models in Microsoft SCOPE
+    - SCOPE = Microsoft's big data analytic system (similar to cloud offerings of other companies)
+
+Fig 1 => Ratio of cost estimates with the actual runtime agencies in SCOPE
+    Unfortunately, the curve is both under-estimated and over-estimated (Away from ideal line)
+
+Common belief that,
+    correcting Cardinality often leads to higher cost model accuracy
+        (Cardinality = number of unique columns)
+
+    - Still after correcting the cardinalities, there was a huge gap in estimated and actual feedback
+    - This shows how difficult it is to model runtime behaviour of physical operators in big data systems
+
+Reasons for poor cost model accuracy
+    - Achieving high accuracy in big data systems requires lot more features and complex transformations
+        that are very hard to model manually or via heuristics
+        - Features such as Parameter, input, partition are very imp in big data systems (leads to sharp drop in error)
+
+    - In traditional model, weights of features typically remains constant (regardless of context of workload in which they occur)
+        - In contrast, optimal weights of features of (Hash join) operator vary drastically depending on workloads
+
+    - Abundant use of user defined function
+    - Unstructured data
+    - fast changing infrastructure in big data systems
+
+Opportunities for learned cost models (motivated by 2 key characteristics of modern cloud systems)
+    - support massive volumes of workload
+        - SCOPE deployed over 100s of 1000s of machines and jobs,
+            take care of several exabytes of data per day,
+                So, training data is large
+
+    - Massive sharing and redundancy
+        - SCOPE heavily shared among users and teams
+        - so, jobs running in these environment have high degree of overlapping
+            - So have duplicates interesting recurring patterns (like common sub-expression)
+                that could be used to specialize or instance-optimize cost models
+
+CLEO : Cloud LEarning Optimizer
+    - uses learn models to predict cost of physical operators during query optimization
+
+    - During developing, made 3 core contributions :
+        - proposed ML techniques to learn highly accurate cost models
+        - cost depends heavily on resources(like number of machines)
+            - so proposed optimizer to jointly explore resources, and plan and predict cost
+        - integrate CLEO with the SCOPE query optimizer, and
+            develop a feedback loop infrastructure for developing and serving models
+
+    1. Learning cost models : First step
+        - cloud workloads are diverse in nature
+            so difficult to learn a single cost model with high accuracy
+        - instead we try to learn large collection of lightweight but highly specialized cost models
+        
+        - simple approach to learn a cost model for every common sub-plan that frequently occurs in a workload
+            - these models learn the behaviour of route operator conditioned on lower level operators in query plan
+                - so they capture context very effectively
+            - also, cost of route level operators depend more on leaf level inputs 
+                - so less affected by errors in statistics from intermediate operators
+            - due to these factors, most of ML models result in high accuracy and runtime correlations compared to traditional one
+
+            - Cons of these models :
+                - models do not cover entire workload
+                    - sub-plans not seen in training dataset don't have models
+                - due to its strict nature, many models have fewer training samples
+                    - which results in overfitting
+
+            - Fix these issues :
+                - instead learn ensemble model capturing different types of recurring patterns in the workload
+                - recurring patterns belong to the different points on the coverage accuracy spectrum
+                - at one end, we've exactly matching sub-graph models
+                    with high accuracy but least coverage
+                - at other end, we learn cost model per operator (similar to traditional cost models)
+                    - cover entire workload, but with poor accuracy
+                - so there's a accuracy coverage gap between 2 extreme models
+                - we bridge this gap by learning 2 additional cost models 
+                    - with intermediate coverage and accuracy
+                - finally, learn a combined model that takes predictions from each recurring pattern
+                    and subset of features as input
+                    - outputs new prediction
+                    - this ensemble of models achieves high accuracy and 100% of coverage and more robust to overfitting
+
+                (for more info on recurring patterns, features and large functions => refer paper)
+
+    2. Resource awareness aspect of CLEO
+        - cost depends heavily on resources such as number of machines allocated to each operator
+
+        - Fig => P = number of machines
+            - many features involve the number of machines(P) lead to sharp drop in error
+
+        - 2 major challenges in using resources for cost models :
+            - in big data systems, query and Resource optimization are performed separately
+                - in query otimization => sources assumed to be some fixed constant and optimized later
+
+                - Need => joint optimization plan for query and resources
+                            - so we can find resources which leads to optimal cost
+
+            - resources that lead to optimal cost vary from operator to operator
+                - Fig => each of 7 plans can have different optimal resources
+                - but for execution in big data systems,
+                    - operators grouped together into stages
+                    - those having same stage, must have same resource configuration
+
+        - challenge => how to find optimal resource for entire stage ?
+
+        - Their approach :
+            - extend cascades framework with the resource context to jointly explore resources for all operators(within a stage)
+
+            - proposed 2 techniques for efficient exploration of resources during query optimization :
+                - sampling based approach that probes learn models for different resource configuration
+                    - but for achieving high accuracy, we may make high no. of probes 
+                        that can adversely affect optimize time
+
+                - analytical solution that uses simple learned cost models to find a single optimal resource configuration
+                    - helps avoid too many probes of learn models during optimization
+
+                (more details => refer paper)
+
+    3. How do we integrate learned cost models into SCOPE query optimizer ?
+        - Involves 3 parts :
+            - Instrumentation and logging of time statistics and runtime traces
+                - Given the logs, we analyzed it and learn all cost models in parallel(using SCOPE-based model trainer)
+                - then we serialized the model, and feedback to the optimizer
+                - all models for a cluster are loaded into a hash table(by optimizer)
+                    and models are looked up using signatures 
+                        which uniquely identify each sub-graph
+                - finally, cost estimation within the optimizer
+                    we'll replace the call to the default the cost model with learned model invocations
+
+Performance results
+    - Production workload
+        - 39% jobs had plan changes
+            - 70% had improvements, 30% had regressions
+            - improvement of 15.35% in latency, 32.2% on total processing time
+
+    - TPC-H Benchmark
+        - 6 out of 22 jobs had plan changes
+            - 5 had improvements, 1 had regression
+
+Takeways
+    - fixing cardinality is not ufficient for accurate cost models
+    - massive shared workload and recurring patterns enable learning of accurate and lightweight cost models
+    - resource awareness is critical for query optimization
+    - high accuracy cost models don't always lead to better plans
+    - poor search strategy can result in poor plans despite accurate cost models
+    - low regression, regression prediction and inter-operatability --- critical for moving to Production
